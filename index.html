@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Study Timer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: Verdana, sans-serif; }
+  body {
+    background: #000; color: #fff; height: 100vh;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden; transition: background 0.3s, color 0.3s;
+  }
+  .app { display: flex; flex-direction: column; align-items: center; transform: translateY(-30px); }
+
+  .mode-switcher {
+    display: flex; gap: 16px; margin-bottom: 40px;
+    transition: opacity 0.5s ease;
+  }
+  .mode-btn {
+    border-radius: 999px; border: 2px solid #fff; padding: 10px 22px;
+    font-size: 14px; background: transparent; color: #fff;
+    cursor: pointer; transition: background 0.2s, color 0.2s, border 0.2s;
+    min-width: 140px; text-align: center;
+  }
+  .mode-btn.active { background: #fff; color: #000; }
+
+  .timer-display { font-size: 140px; font-weight: 700; letter-spacing: 4px; margin-bottom: 24px; }
+
+  .controls-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+  .primary-btn {
+    width: 140px; height: 50px; border-radius: 999px;
+    border: 2px solid transparent; font-size: 16px;
+    cursor: pointer; font-weight: 600;
+    transition: background 0.3s, color 0.3s, border 0.3s, opacity 0.5s ease;
+  }
+
+  /* Dark theme default button styles */
+  .primary-btn.start-style { background: #fff; color: #000; border-color: transparent; }
+  .primary-btn.inverted-style { background: transparent; border-color: #fff; color: #fff; }
+
+  .primary-btn.hidden { opacity: 0; pointer-events: none; }
+  .primary-btn.visible { opacity: 1; pointer-events: auto; }
+
+  .corner-controls {
+    position: fixed; bottom: 24px; right: 32px;
+    display: flex; gap: 4px; opacity: 1;
+    transition: opacity 0.5s ease;
+  }
+  .corner-btn {
+    border-radius: 999px; width: 40px; height: 40px; border: none;
+    background: transparent; font-size: 20px; color: inherit;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  .corner-btn:hover { opacity: 0.7; }
+
+  /* Hide extra UI while running (fading handled on main button) */
+  body.running .mode-switcher,
+  body.running .corner-controls {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Modal */
+  .modal.hidden { display: none; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-panel {
+    background: #151515;
+    color: #fff;
+    width: 720px;
+    max-width: 95vw;
+    height: 500px;
+    border-radius: 20px;
+    padding: 32px 36px 24px 36px;
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 24px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #333;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.9);
+  }
+  .modal-close-x { position: absolute; right: 24px; top: 20px; font-size: 20px; cursor: pointer; }
+  .settings-sidebar { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .settings-tab-btn {
+    text-align: left; background: transparent; border: none;
+    color: #999; padding: 4px 0; font-size: 14px; cursor: pointer;
+  }
+  .settings-tab-btn.active { color: #fff; font-weight: 600; }
+  .settings-tab { display: none; font-size: 14px; }
+  .settings-tab.active { display: block; }
+  .settings-tab h3 { margin-bottom: 16px; font-size: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; margin-bottom: 4px; }
+  .field input[type="number"], .field select {
+    width: 220px; padding: 6px 10px;
+    border-radius: 8px; border: 1px solid #444;
+    background: #000; color: #fff; font-size: 13px;
+  }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .range-row { margin-top: 8px; }
+  input[type="range"] { width: 240px; }
+  .modal-footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .danger-btn {
+    border-radius: 999px; border: 1px solid #f55;
+    background: transparent; color: #f55;
+    padding: 8px 20px; cursor: pointer; font-size: 14px;
+  }
+  .secondary-btn, .save-btn {
+    border-radius: 999px; border: none; padding: 8px 18px; font-size: 14px; cursor: pointer;
+  }
+  .secondary-btn { background: #3d4148; color: #fff; margin-right: 8px; }
+  .save-btn { background: #fff; color: #000; font-weight: 600; }
+
+  /* Light theme */
+  body.light { background: #fff; color: #000; }
+  body.light .primary-btn.start-style { background: #000; color: #fff; border-color: transparent; }
+  body.light .primary-btn.inverted-style { background: transparent; border-color: #000; color: #000; }
+  body.light .mode-btn { border-color: #000; color: #000; }
+  body.light .mode-btn.active { background: #000; color: #fff; }
+  body.light .corner-btn { color: #000; }
+  body.light .modal-panel { background: #f2f2f2; color: #000; border-color: #ccc; box-shadow: 0 24px 60px rgba(0,0,0,0.4); }
+  body.light .settings-tab-btn.active { color: #000; }
+  body.light .field input[type="number"], body.light .field select {
+    background: #fff; color: #000; border: 1px solid #aaa;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="mode-switcher">
+      <button class="mode-btn active" data-mode="timer">timer</button>
+      <button class="mode-btn" data-mode="stopwatch">stopwatch</button>
+    </div>
+
+    <div id="time" class="timer-display">25:00</div>
+
+    <div class="controls-row">
+      <button id="startPause" class="primary-btn start-style visible">start</button>
+    </div>
+  </div>
+
+  <div class="corner-controls">
+    <button id="reset" class="corner-btn" title="Reset">&#8635;</button>
+    <button id="settings" class="corner-btn" title="Settings">&#9881;</button>
+  </div>
+
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-close-x" id="modalCloseX">&#10005;</div>
+      <div class="settings-sidebar">
+        <button class="settings-tab-btn active" data-tab="generalTab">General</button>
+        <button class="settings-tab-btn" data-tab="timersTab">Timers</button>
+        <button class="settings-tab-btn" data-tab="soundsTab">Sounds</button>
+      </div>
+      <div>
+        <section id="generalTab" class="settings-tab active">
+          <h3>General</h3>
+          <div class="field">
+            <label>Theme</label>
+            <select id="themeSelect">
+              <option value="dark" selected>Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+        </section>
+        <section id="timersTab" class="settings-tab">
+          <h3>Timers</h3>
+          <div class="field">
+            <label>Timer minutes</label>
+            <input type="number" id="timerMinutesInput" value="25" min="0">
+          </div>
+          <div class="field">
+            <label>Timer seconds</label>
+            <input type="number" id="timerSecondsInput" value="0" min="0" max="59">
+          </div>
+        </section>
+        <section id="soundsTab" class="settings-tab">
+          <h3>Sounds</h3>
+          <div class="toggle-row">
+            <input type="checkbox" id="soundToggle" checked />
+            <label for="soundToggle">Play sound when timer finishes</label>
+          </div>
+          <div class="range-row">
+            <label>Alert volume</label><br>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.6" />
+          </div>
+        </section>
+        <div class="modal-footer">
+          <button id="resetAllBtn" class="danger-btn">Reset all</button>
+          <div>
+            <button id="closeSettings" class="secondary-btn">Close</button>
+            <button id="saveSettings" class="save-btn">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="alertSound" src="lemonade.mp3"></audio>
+
+<script>
+let timerMinutes = 25;
+let timerSeconds = 0;
+let mode = "timer";
+let remainingSeconds = getTimerDuration();
+let elapsedSeconds = 0;
+let intervalId = null;
+let running = false;
+let finished = false;
+
+const timeEl = document.getElementById("time");
+const startPauseBtn = document.getElementById("startPause");
+const resetBtn = document.getElementById("reset");
+const modeButtons = document.querySelectorAll(".mode-btn");
+const alertSound = document.getElementById("alertSound");
+
+const settingsBtn = document.getElementById("settings");
+const settingsModal = document.getElementById("settingsModal");
+const closeSettings = document.getElementById("closeSettings");
+const modalCloseX = document.getElementById("modalCloseX");
+const saveSettings = document.getElementById("saveSettings");
+const resetAllBtn = document.getElementById("resetAllBtn");
+const timerMinutesInput = document.getElementById("timerMinutesInput");
+const timerSecondsInput = document.getElementById("timerSecondsInput");
+const soundToggle = document.getElementById("soundToggle");
+const volumeSlider = document.getElementById("volumeSlider");
+const themeSelect = document.getElementById("themeSelect");
+const tabButtons = document.querySelectorAll(".settings-tab-btn");
+const tabs = document.querySelectorAll(".settings-tab");
+
+let soundEnabled = true;
+let soundVolume = 0.6;
+
+// helper: total seconds from minutes+seconds
+function getTimerDuration() {
+  const mins = Math.max(0, parseInt(timerMinutes, 10) || 0);
+  const secsRaw = Math.max(0, parseInt(timerSeconds, 10) || 0);
+  const secs = Math.min(secsRaw, 59);
+  return mins * 60 + secs;
+}
+
+function fmt(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;
+}
+
+function update() {
+  if (mode === "timer") {
+    timeEl.textContent = fmt(remainingSeconds);
+  } else {
+    timeEl.textContent = fmt(elapsedSeconds);
+  }
+}
+
+function stopSound() {
+  alertSound.pause();
+  alertSound.currentTime = 0;
+  alertSound.loop = false;
+}
+function playSoundLoop() {
+  if (!soundEnabled) return;
+  alertSound.loop = true;
+  alertSound.volume = soundVolume;
+  alertSound.play().catch(()=>{});
+}
+
+function setStartStyle() {
+  startPauseBtn.classList.add("start-style");
+  startPauseBtn.classList.remove("inverted-style");
+}
+function setInvertedStyle() {
+  startPauseBtn.classList.remove("start-style");
+  startPauseBtn.classList.add("inverted-style");
+}
+
+function stopTimer() {
+  running = false;
+  finished = false;
+  clearInterval(intervalId);
+  intervalId = null;
+  document.body.classList.remove("running");
+  startPauseBtn.textContent = "start";
+  setStartStyle();
+  startPauseBtn.classList.remove("hidden");
+  startPauseBtn.classList.add("visible");
+  stopSound();
+}
+
+function finishTimer() {
+  running = false;
+  finished = true;
+  clearInterval(intervalId);
+  intervalId = null;
+  document.body.classList.remove("running");
+  playSoundLoop();
+  startPauseBtn.textContent = "stop";
+  setStartStyle(); // stop = filled pill
+  startPauseBtn.classList.remove("hidden");
+  startPauseBtn.classList.add("visible");
+}
+
+function tickTimer() {
+  if (remainingSeconds > 0) {
+    remainingSeconds--;
+    update();
+  } else {
+    finishTimer();
+  }
+}
+
+function tickStopwatch() {
+  elapsedSeconds++;
+  update();
+}
+
+function startTimerOrStopwatch() {
+  if (running) return;
+  running = true;
+  finished = false;
+  document.body.classList.add("running");
+  startPauseBtn.textContent = "pause";
+  setInvertedStyle();
+  startPauseBtn.classList.remove("hidden");
+  startPauseBtn.classList.add("visible");
+
+  if (mode === "timer") {
+    if (remainingSeconds <= 0) {
+      remainingSeconds = getTimerDuration();
+      update();
+    }
+    intervalId = setInterval(tickTimer, 1000);
+  } else {
+    intervalId = setInterval(tickStopwatch, 1000);
+  }
+}
+
+startPauseBtn.onclick = () => {
+  if (running) {
+    // pause
+    stopTimer();
+  } else {
+    if (mode === "timer" && finished) {
+      // stop: reset timer only
+      stopSound();
+      finished = false;
+      remainingSeconds = getTimerDuration();
+      startPauseBtn.textContent = "start";
+      setStartStyle();
+      update();
+    } else {
+      startTimerOrStopwatch();
+    }
+  }
+};
+
+modeButtons.forEach(btn => {
+  btn.onclick = () => {
+    if (mode === btn.dataset.mode) return;
+    modeButtons.forEach(b => b.classList.toggle("active", b === btn));
+    stopTimer();
+    finished = false;
+    mode = btn.dataset.mode;
+    if (mode === "timer") {
+      remainingSeconds = getTimerDuration();
+    } else {
+      elapsedSeconds = 0;
+    }
+    update();
+  };
+});
+
+resetBtn.onclick = () => {
+  stopTimer();
+  if (mode === "timer") {
+    remainingSeconds = getTimerDuration();
+  } else {
+    elapsedSeconds = 0;
+  }
+  finished = false;
+  update();
+};
+
+// fade for main button while running
+let fadeTimeout;
+document.addEventListener("mousemove", () => {
+  if (!running) return;
+  startPauseBtn.classList.remove("hidden");
+  startPauseBtn.classList.add("visible");
+  clearTimeout(fadeTimeout);
+  fadeTimeout = setTimeout(() => {
+    if (running) {
+      startPauseBtn.classList.remove("visible");
+      startPauseBtn.classList.add("hidden");
+    }
+  }, 1500);
+});
+
+// settings modal
+settingsBtn.onclick = () => settingsModal.classList.remove("hidden");
+closeSettings.onclick = () => settingsModal.classList.add("hidden");
+modalCloseX.onclick = () => settingsModal.classList.add("hidden");
+settingsModal.onclick = e => { if (e.target === settingsModal) settingsModal.classList.add("hidden"); };
+
+saveSettings.onclick = () => {
+  timerMinutes = parseInt(timerMinutesInput.value, 10);
+  timerSeconds = parseInt(timerSecondsInput.value, 10);
+  if (isNaN(timerMinutes) || timerMinutes < 0) timerMinutes = 0;
+  if (isNaN(timerSeconds) || timerSeconds < 0) timerSeconds = 0;
+  if (timerSeconds > 59) timerSeconds = 59;
+
+  soundEnabled = soundToggle.checked;
+  soundVolume = parseFloat(volumeSlider.value);
+  applyTheme(themeSelect.value);
+
+  stopTimer();
+  remainingSeconds = getTimerDuration();
+  update();
+  settingsModal.classList.add("hidden");
+};
+
+resetAllBtn.onclick = () => {
+  timerMinutes = 25;
+  timerSeconds = 0;
+  timerMinutesInput.value = 25;
+  timerSecondsInput.value = 0;
+
+  soundEnabled = true;
+  soundToggle.checked = true;
+  soundVolume = 0.6;
+  volumeSlider.value = 0.6;
+
+  themeSelect.value = "dark";
+  applyTheme("dark");
+
+  stopTimer();
+  remainingSeconds = getTimerDuration();
+  update();
+};
+
+function applyTheme(theme) {
+  document.body.classList.remove("dark", "light");
+  document.body.classList.add(theme);
+}
+
+// settings tabs
+tabButtons.forEach(b => b.onclick = () => {
+  tabButtons.forEach(x => x.classList.toggle("active", x === b));
+  tabs.forEach(t => t.classList.toggle("active", t.id === b.dataset.tab));
+});
+
+update();
+</script>
+</body>
+</html>
