@@ -234,6 +234,46 @@ const tabs = document.querySelectorAll(".settings-tab");
 
 let soundEnabled = true;
 let soundVolume = 0.6;
+function saveSettingsToStorage() {
+  const data = {
+    timerMinutes,
+    timerSeconds,
+    soundEnabled,
+    soundVolume,
+    theme: document.body.classList.contains("light") ? "light" : "dark",
+  };
+  try {
+    localStorage.setItem("studyTimerSettings", JSON.stringify(data));
+  } catch (e) {
+    // ignore if storage not available
+  }
+}
+
+function loadSettingsFromStorage() {
+  try {
+    const raw = localStorage.getItem("studyTimerSettings");
+    if (!raw) return;
+    const data = JSON.parse(raw);
+
+    if (typeof data.timerMinutes === "number") timerMinutes = data.timerMinutes;
+    if (typeof data.timerSeconds === "number") timerSeconds = data.timerSeconds;
+    if (typeof data.soundEnabled === "boolean") soundEnabled = data.soundEnabled;
+    if (typeof data.soundVolume === "number") soundVolume = data.soundVolume;
+    if (data.theme === "light" || data.theme === "dark") applyTheme(data.theme);
+
+    // update inputs to match stored values
+    timerMinutesInput.value = timerMinutes;
+    timerSecondsInput.value = Math.min(Math.max(timerSeconds, 0), 59);
+    soundToggle.checked = soundEnabled;
+    volumeSlider.value = soundVolume;
+    themeSelect.value = data.theme || "dark";
+
+    // recalc timer from stored values
+    remainingSeconds = getTimerDuration();
+  } catch (e) {
+    // ignore parse errors
+  }
+}
 
 // helper: total seconds from minutes+seconds
 function getTimerDuration() {
@@ -419,6 +459,7 @@ saveSettings.onclick = () => {
 
   stopTimer();
   remainingSeconds = getTimerDuration();
+  saveSettingsToStorage();
   update();
   settingsModal.classList.add("hidden");
 };
@@ -439,6 +480,7 @@ resetAllBtn.onclick = () => {
 
   stopTimer();
   remainingSeconds = getTimerDuration();
+  saveSettingsToStorage();
   update();
 };
 
@@ -452,7 +494,8 @@ tabButtons.forEach(b => b.onclick = () => {
   tabButtons.forEach(x => x.classList.toggle("active", x === b));
   tabs.forEach(t => t.classList.toggle("active", t.id === b.dataset.tab));
 });
-
+ 
+loadSettingsFromStorage();
 update();
 </script>
 </body>
